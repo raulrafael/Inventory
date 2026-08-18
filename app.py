@@ -9,7 +9,6 @@ from email.mime.text import MIMEText
 from fpdf import FPDF
 import os
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class Producto:
     def __init__(self, nombre, cantidad, unidad_medida, fecha_vencimiento, tarifa):
