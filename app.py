@@ -77,12 +77,15 @@ class Inventario:
                 productos_vencidos.append(producto)
         return productos_vencidos
     
-    def exportar_a_csv(self, nombre_archivo):
+    def _escribir_csv(self, nombre_archivo):
         with open(nombre_archivo, mode='w', newline='') as archivo:
             escritor_csv = csv.writer(archivo)
             escritor_csv.writerow(["Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"])
             for producto in self.productos:
                 escritor_csv.writerow([producto.nombre, producto.cantidad, producto.unidad_medida, producto.fecha_vencimiento.strftime('%Y-%m-%d'), producto.tarifa, producto.temperatura])
+
+    def exportar_a_csv(self, nombre_archivo):
+        self._escribir_csv(nombre_archivo)
         print(f"Inventario exportado a {nombre_archivo}")
 
     def generar_reporte(self, criterio, valor):
@@ -97,11 +100,7 @@ class Inventario:
         return reporte
     
     def guardar_inventario(self, nombre_archivo):
-        with open(nombre_archivo, 'w', newline='') as archivo:
-            escritor_csv = csv.writer(archivo)
-            escritor_csv.writerow(["Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"])
-            for producto in self.productos:
-                escritor_csv.writerow([producto.nombre, producto.cantidad, producto.unidad_medida, producto.fecha_vencimiento.strftime('%Y-%m-%d'), producto.tarifa, producto.temperatura])
+        self._escribir_csv(nombre_archivo)
         print(f"Inventario guardado en {nombre_archivo}")
 
     def cargar_inventario(self, nombre_archivo):
