@@ -487,14 +487,28 @@ class InventarioGUI:
         self.verificar_fechas_btn = tk.Button(self.tab_consultas, text="Verificar Fechas de Vencimiento", command=self.verificar_fechas_vencimiento)
         self.verificar_fechas_btn.grid(row=1, column=0, pady=10, padx=5)
 
-        self.tabla = ttk.Treeview(self.tab_consultas, columns=("Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"), show='headings')
+        self.tabla_frame = tk.Frame(self.tab_consultas)
+        self.tabla_frame.grid(row=2, column=0, columnspan=3, pady=10, padx=5, sticky="nsew")
+        self.tab_consultas.grid_rowconfigure(2, weight=1)
+        self.tab_consultas.grid_columnconfigure(0, weight=1)
+
+        self.tabla_scroll_y = ttk.Scrollbar(self.tabla_frame, orient="vertical")
+        self.tabla_scroll_y.pack(side="right", fill="y")
+
+        self.tabla_scroll_x = ttk.Scrollbar(self.tabla_frame, orient="horizontal")
+        self.tabla_scroll_x.pack(side="bottom", fill="x")
+
+        self.tabla = ttk.Treeview(self.tabla_frame, columns=("Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"), show='headings', yscrollcommand=self.tabla_scroll_y.set, xscrollcommand=self.tabla_scroll_x.set)
+        self.tabla_scroll_y.config(command=self.tabla.yview)
+        self.tabla_scroll_x.config(command=self.tabla.xview)
+
         self.tabla.heading("Nombre", text="Nombre")
         self.tabla.heading("Cantidad", text="Cantidad")
         self.tabla.heading("Unidad de Medida", text="Unidad de Medida")
         self.tabla.heading("Fecha de Vencimiento", text="Fecha de Vencimiento")
         self.tabla.heading("Tarifa", text="Tarifa")
         self.tabla.heading("Temperatura", text="Temperatura")
-        self.tabla.grid(row=2, column=0, columnspan=3, pady=10, padx=5)
+        self.tabla.pack(side="left", fill="both", expand=True)
 
         # Tab Reportes
         self.exportar_lbl = tk.Label(self.tab_reportes, text="Nombre del archivo CSV:")
