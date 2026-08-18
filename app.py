@@ -11,6 +11,20 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+def validar_cantidad(cantidad):
+    try:
+        cant = float(cantidad)
+        return cant > 0
+    except ValueError:
+        return False
+
+def validar_fecha(fecha_vencimiento):
+    try:
+        datetime.datetime.strptime(fecha_vencimiento, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
 class Producto:
     def __init__(self, nombre, cantidad, unidad_medida, fecha_vencimiento, tarifa):
         self.nombre = nombre
