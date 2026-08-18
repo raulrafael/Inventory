@@ -141,22 +141,10 @@ class Registro:
         self.transporte = transporte
         self.fecha = fecha
 
-class Cliente:
-    def __init__(self, nombre, contacto):
-        self.nombre = nombre
-        self.contacto = contacto
-
-class Proveedor:
-    def __init__(self, nombre, contacto):
-        self.nombre = nombre
-        self.contacto = contacto
-
 class SistemaInventario:
     def __init__(self):
         self.almacenes = {}
         self.registros = []
-        self.clientes = {}
-        self.proveedores = {}
 
     def agregar_almacen(self, nombre):
         if nombre not in self.almacenes:
@@ -230,18 +218,6 @@ class SistemaInventario:
         plt.tight_layout()
         plt.savefig(nombre_archivo)
         plt.close()
-
-    def agregar_cliente(self, nombre, contacto):
-        if nombre not in self.clientes:
-            self.clientes[nombre] = Cliente(nombre, contacto)
-            return True
-        return False
-
-    def agregar_proveedor(self, nombre, contacto):
-        if nombre not in self.proveedores:
-            self.proveedores[nombre] = Proveedor(nombre, contacto)
-            return True
-        return False
 
     def generar_notificacion(self, mensaje):
         # Aquí puedes implementar un sistema de notificaciones push
