@@ -11,6 +11,20 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+def validar_cantidad(cantidad):
+    try:
+        val = float(cantidad)
+        return val >= 0
+    except ValueError:
+        return False
+
+def validar_fecha(fecha_str):
+    try:
+        datetime.datetime.strptime(fecha_str, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
 class Producto:
     def __init__(self, nombre, cantidad, unidad_medida, fecha_vencimiento, tarifa):
         self.nombre = nombre
@@ -113,7 +127,8 @@ class Inventario:
                 for fila in lector_csv:
                     if len(fila) == 6:
                         nombre, cantidad, unidad_medida, fecha_vencimiento, tarifa, temperatura = fila
-                        producto = Producto(nombre, float(cantidad), unidad_medida, fecha_vencimiento, float(tarifa))
+                        tarifa_val = float(tarifa) if tarifa else 0.0
+                        producto = Producto(nombre, float(cantidad), unidad_medida, fecha_vencimiento, tarifa_val)
                         producto.temperatura = temperatura
                         self.productos.append(producto)
             print(f"Inventario cargado desde {nombre_archivo}")
@@ -216,9 +231,12 @@ class SistemaInventario:
             pdf.cell(200, 10, txt=linea, ln=True, align='L')
         pdf.output(nombre_archivo)
 
-    def generar_grafico(self, nombre_archivo):
-        productos = [producto.nombre for producto in self.almacenes["default"].productos]
-        cantidades = [producto.cantidad for producto in self.almacenes["default"].productos]
+    def generar_grafico(self, nombre_archivo, nombre_almacen):
+        if nombre_almacen not in self.almacenes:
+            return False
+
+        productos = [producto.nombre for producto in self.almacenes[nombre_almacen].productos]
+        cantidades = [producto.cantidad for producto in self.almacenes[nombre_almacen].productos]
         
         fig, ax = plt.subplots()
         ax.bar(productos, cantidades)
@@ -248,30 +266,32 @@ class SistemaInventario:
         print(f"Notificación: {mensaje}")
 
 class Usuario:
-    def __init__(self, nombre_usuario, contraseña):
+    def __init__(self, nombre_usuario, contraseña, rol='usuario'):
         self.nombre_usuario = nombre_usuario
         self.contraseña = contraseña
+        self.rol = rol
 
 class SistemaAutenticacion:
     def __init__(self):
         self.usuarios = {}
     
-    def registrar_usuario(self, nombre_usuario, contraseña):
+    def registrar_usuario(self, nombre_usuario, contraseña, rol='usuario'):
         if nombre_usuario not in self.usuarios:
-            self.usuarios[nombre_usuario] = Usuario(nombre_usuario, contraseña)
+            self.usuarios[nombre_usuario] = Usuario(nombre_usuario, contraseña, rol)
             return True
         return False
     
     def autenticar_usuario(self, nombre_usuario, contraseña):
         if nombre_usuario in self.usuarios and self.usuarios[nombre_usuario].contraseña == contraseña:
-            return True
-        return False
+            return self.usuarios[nombre_usuario]
+        return None
 
 class InventarioGUI:
     def __init__(self, root, sistema_inventario, sistema_autenticacion):
         self.sistema_inventario = sistema_inventario
         self.sistema_autenticacion = sistema_autenticacion
         self.inventario = None
+        self.usuario_actual = None
         self.root = root
         self.root.title("Inventario de Almacenamiento Frío")
         
@@ -300,7 +320,9 @@ class InventarioGUI:
     def login(self):
         nombre_usuario = self.nombre_usuario_entry.get()
         contraseña = self.contraseña_entry.get()
-        if self.sistema_autenticacion.autenticar_usuario(nombre_usuario, contraseña):
+        usuario = self.sistema_autenticacion.autenticar_usuario(nombre_usuario, contraseña)
+        if usuario:
+            self.usuario_actual = usuario
             self.crear_interfaz()
         else:
             messagebox.showerror("Error", "Nombre de usuario o contraseña incorrectos.")
@@ -317,184 +339,205 @@ class InventarioGUI:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        self.almacen_lbl = tk.Label(self.root, text="Nombre del Almacén:")
-        self.almacen_lbl.grid(row=0, column=0)
-        self.almacen_entry = tk.Entry(self.root)
-        self.almacen_entry.grid(row=0, column=1)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(expand=True, fill='both')
 
-        self.agregar_almacen_btn = tk.Button(self.root, text="Agregar Almacén", command=self.agregar_almacen)
-        self.agregar_almacen_btn.grid(row=0, column=2, pady=10)
+        # Create frames for tabs
+        self.tab_almacen = ttk.Frame(self.notebook)
+        self.tab_productos = ttk.Frame(self.notebook)
+        self.tab_transporte = ttk.Frame(self.notebook)
+        self.tab_consultas = ttk.Frame(self.notebook)
+        self.tab_reportes = ttk.Frame(self.notebook)
 
-        self.almacenes_combo = ttk.Combobox(self.root, state="readonly")
-        self.almacenes_combo.grid(row=1, column=1)
+        self.notebook.add(self.tab_almacen, text="Almacén")
+        self.notebook.add(self.tab_productos, text="Productos")
+        self.notebook.add(self.tab_transporte, text="Transporte")
+        self.notebook.add(self.tab_consultas, text="Consultas")
+
+        # Only admin sees reportes
+        if self.usuario_actual and self.usuario_actual.rol == 'admin':
+            self.notebook.add(self.tab_reportes, text="Reportes")
+
+        # Tab Almacén
+        self.almacen_lbl = tk.Label(self.tab_almacen, text="Nombre del Almacén:")
+        self.almacen_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.almacen_entry = tk.Entry(self.tab_almacen)
+        self.almacen_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.agregar_almacen_btn = tk.Button(self.tab_almacen, text="Agregar Almacén", command=self.agregar_almacen)
+        self.agregar_almacen_btn.grid(row=0, column=2, padx=5, pady=5)
+
+        self.almacenes_lbl = tk.Label(self.tab_almacen, text="Seleccionar Almacén:")
+        self.almacenes_lbl.grid(row=1, column=0, padx=5, pady=5)
+        self.almacenes_combo = ttk.Combobox(self.tab_almacen, state="readonly")
+        self.almacenes_combo.grid(row=1, column=1, padx=5, pady=5)
         self.almacenes_combo.bind("<<ComboboxSelected>>", self.seleccionar_almacen)
 
-        self.nombre_lbl = tk.Label(self.root, text="Nombre del Producto:")
-        self.nombre_lbl.grid(row=2, column=0)
-        self.nombre_entry = tk.Entry(self.root)
-        self.nombre_entry.grid(row=2, column=1)
+        self.salir_btn = tk.Button(self.tab_almacen, text="Salir", command=self.root.quit)
+        self.salir_btn.grid(row=2, column=0, pady=10)
 
-        self.cantidad_lbl = tk.Label(self.root, text="Cantidad:")
-        self.cantidad_lbl.grid(row=3, column=0)
-        self.cantidad_entry = tk.Entry(self.root)
-        self.cantidad_entry.grid(row=3, column=1)
+        # Tab Productos
+        self.nombre_lbl = tk.Label(self.tab_productos, text="Nombre del Producto:")
+        self.nombre_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.nombre_entry = tk.Entry(self.tab_productos)
+        self.nombre_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        self.unidad_medida_lbl = tk.Label(self.root, text="Unidad de Medida:")
-        self.unidad_medida_lbl.grid(row=4, column=0)
-        self.unidad_medida_entry = tk.Entry(self.root)
-        self.unidad_medida_entry.grid(row=4, column=1)
+        self.cantidad_lbl = tk.Label(self.tab_productos, text="Cantidad:")
+        self.cantidad_lbl.grid(row=1, column=0, padx=5, pady=5)
+        self.cantidad_entry = tk.Entry(self.tab_productos)
+        self.cantidad_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        self.fecha_vencimiento_lbl = tk.Label(self.root, text="Fecha de Vencimiento (YYYY-MM-DD):")
-        self.fecha_vencimiento_lbl.grid(row=5, column=0)
-        self.fecha_vencimiento_entry = tk.Entry(self.root)
-        self.fecha_vencimiento_entry.grid(row=5, column=1)
+        self.unidad_medida_lbl = tk.Label(self.tab_productos, text="Unidad de Medida:")
+        self.unidad_medida_lbl.grid(row=2, column=0, padx=5, pady=5)
+        self.unidad_medida_entry = tk.Entry(self.tab_productos)
+        self.unidad_medida_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        self.tarifa_lbl = tk.Label(self.root, text="Tarifa:")
-        self.tarifa_lbl.grid(row=6, column=0)
-        self.tarifa_entry = tk.Entry(self.root)
-        self.tarifa_entry.grid(row=6, column=1)
+        self.fecha_vencimiento_lbl = tk.Label(self.tab_productos, text="Fecha de Vencimiento (YYYY-MM-DD):")
+        self.fecha_vencimiento_lbl.grid(row=3, column=0, padx=5, pady=5)
+        self.fecha_vencimiento_entry = tk.Entry(self.tab_productos)
+        self.fecha_vencimiento_entry.grid(row=3, column=1, padx=5, pady=5)
 
-        self.temperatura_lbl = tk.Label(self.root, text="Temperatura del Producto:")
-        self.temperatura_lbl.grid(row=7, column=0)
-        self.temperatura_entry = tk.Entry(self.root)
-        self.temperatura_entry.grid(row=7, column=1)
+        self.tarifa_lbl = tk.Label(self.tab_productos, text="Tarifa:")
+        self.tarifa_lbl.grid(row=4, column=0, padx=5, pady=5)
+        self.tarifa_entry = tk.Entry(self.tab_productos)
+        self.tarifa_entry.grid(row=4, column=1, padx=5, pady=5)
 
-        self.agregar_btn = tk.Button(self.root, text="Agregar Producto", command=self.agregar_producto)
-        self.agregar_btn.grid(row=8, column=0, pady=10)
+        self.temperatura_lbl = tk.Label(self.tab_productos, text="Temperatura del Producto:")
+        self.temperatura_lbl.grid(row=5, column=0, padx=5, pady=5)
+        self.temperatura_entry = tk.Entry(self.tab_productos)
+        self.temperatura_entry.grid(row=5, column=1, padx=5, pady=5)
 
-        self.remover_lbl = tk.Label(self.root, text="Remover Producto:")
-        self.remover_lbl.grid(row=9, column=0)
-        self.remover_entry = tk.Entry(self.root)
-        self.remover_entry.grid(row=9, column=1)
+        self.agregar_btn = tk.Button(self.tab_productos, text="Agregar Producto", command=self.agregar_producto)
+        self.agregar_btn.grid(row=6, column=0, pady=10)
 
-        self.remover_cantidad_lbl = tk.Label(self.root, text="Cantidad a Remover:")
-        self.remover_cantidad_lbl.grid(row=10, column=0)
-        self.remover_cantidad_entry = tk.Entry(self.root)
-        self.remover_cantidad_entry.grid(row=10, column=1)
+        self.remover_lbl = tk.Label(self.tab_productos, text="Remover Producto:")
+        self.remover_lbl.grid(row=7, column=0, padx=5, pady=5)
+        self.remover_entry = tk.Entry(self.tab_productos)
+        self.remover_entry.grid(row=7, column=1, padx=5, pady=5)
 
-        self.remover_btn = tk.Button(self.root, text="Remover Producto", command=self.remover_producto)
-        self.remover_btn.grid(row=11, column=0, pady=10)
+        self.remover_cantidad_lbl = tk.Label(self.tab_productos, text="Cantidad a Remover:")
+        self.remover_cantidad_lbl.grid(row=8, column=0, padx=5, pady=5)
+        self.remover_cantidad_entry = tk.Entry(self.tab_productos)
+        self.remover_cantidad_entry.grid(row=8, column=1, padx=5, pady=5)
 
-        self.editar_lbl = tk.Label(self.root, text="Editar Producto:")
-        self.editar_lbl.grid(row=12, column=0)
-        self.editar_entry = tk.Entry(self.root)
-        self.editar_entry.grid(row=12, column=1)
+        self.remover_btn = tk.Button(self.tab_productos, text="Remover Producto", command=self.remover_producto)
+        self.remover_btn.grid(row=9, column=0, pady=10)
 
-        self.editar_cantidad_lbl = tk.Label(self.root, text="Nueva Cantidad:")
-        self.editar_cantidad_lbl.grid(row=13, column=0)
-        self.editar_cantidad_entry = tk.Entry(self.root)
-        self.editar_cantidad_entry.grid(row=13, column=1)
+        self.editar_lbl = tk.Label(self.tab_productos, text="Editar Producto:")
+        self.editar_lbl.grid(row=10, column=0, padx=5, pady=5)
+        self.editar_entry = tk.Entry(self.tab_productos)
+        self.editar_entry.grid(row=10, column=1, padx=5, pady=5)
 
-        self.editar_unidad_lbl = tk.Label(self.root, text="Nueva Unidad de Medida:")
-        self.editar_unidad_lbl.grid(row=14, column=0)
-        self.editar_unidad_entry = tk.Entry(self.root)
-        self.editar_unidad_entry.grid(row=14, column=1)
+        self.editar_cantidad_lbl = tk.Label(self.tab_productos, text="Nueva Cantidad:")
+        self.editar_cantidad_lbl.grid(row=11, column=0, padx=5, pady=5)
+        self.editar_cantidad_entry = tk.Entry(self.tab_productos)
+        self.editar_cantidad_entry.grid(row=11, column=1, padx=5, pady=5)
 
-        self.editar_fecha_lbl = tk.Label(self.root, text="Nueva Fecha de Vencimiento (YYYY-MM-DD):")
-        self.editar_fecha_lbl.grid(row=15, column=0)
-        self.editar_fecha_entry = tk.Entry(self.root)
-        self.editar_fecha_entry.grid(row=15, column=1)
+        self.editar_unidad_lbl = tk.Label(self.tab_productos, text="Nueva Unidad de Medida:")
+        self.editar_unidad_lbl.grid(row=12, column=0, padx=5, pady=5)
+        self.editar_unidad_entry = tk.Entry(self.tab_productos)
+        self.editar_unidad_entry.grid(row=12, column=1, padx=5, pady=5)
 
-        self.editar_tarifa_lbl = tk.Label(self.root, text="Nueva Tarifa:")
-        self.editar_tarifa_lbl.grid(row=16, column=0)
-        self.editar_tarifa_entry = tk.Entry(self.root)
-        self.editar_tarifa_entry.grid(row=16, column=1)
+        self.editar_fecha_lbl = tk.Label(self.tab_productos, text="Nueva Fecha (YYYY-MM-DD):")
+        self.editar_fecha_lbl.grid(row=13, column=0, padx=5, pady=5)
+        self.editar_fecha_entry = tk.Entry(self.tab_productos)
+        self.editar_fecha_entry.grid(row=13, column=1, padx=5, pady=5)
 
-        self.editar_temperatura_lbl = tk.Label(self.root, text="Nueva Temperatura:")
-        self.editar_temperatura_lbl.grid(row=17, column=0)
-        self.editar_temperatura_entry = tk.Entry(self.root)
-        self.editar_temperatura_entry.grid(row=17, column=1)
+        self.editar_tarifa_lbl = tk.Label(self.tab_productos, text="Nueva Tarifa:")
+        self.editar_tarifa_lbl.grid(row=14, column=0, padx=5, pady=5)
+        self.editar_tarifa_entry = tk.Entry(self.tab_productos)
+        self.editar_tarifa_entry.grid(row=14, column=1, padx=5, pady=5)
 
-        self.editar_btn = tk.Button(self.root, text="Editar Producto", command=self.editar_producto)
-        self.editar_btn.grid(row=18, column=0, pady=10)
+        self.editar_temperatura_lbl = tk.Label(self.tab_productos, text="Nueva Temperatura:")
+        self.editar_temperatura_lbl.grid(row=15, column=0, padx=5, pady=5)
+        self.editar_temperatura_entry = tk.Entry(self.tab_productos)
+        self.editar_temperatura_entry.grid(row=15, column=1, padx=5, pady=5)
 
-        self.consultar_btn = tk.Button(self.root, text="Consultar Inventario", command=self.consultar_inventario)
-        self.consultar_btn.grid(row=19, column=0, pady=10)
+        self.editar_btn = tk.Button(self.tab_productos, text="Editar Producto", command=self.editar_producto)
+        self.editar_btn.grid(row=16, column=0, pady=10)
 
-        self.verificar_fechas_btn = tk.Button(self.root, text="Verificar Fechas de Vencimiento", command=self.verificar_fechas_vencimiento)
-        self.verificar_fechas_btn.grid(row=20, column=0, pady=10)
+        # Tab Transporte
+        self.ingreso_egreso_lbl = tk.Label(self.tab_transporte, text="Ingreso/Egreso:")
+        self.ingreso_egreso_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.ingreso_egreso_entry = ttk.Combobox(self.tab_transporte, values=["ingreso", "egreso"])
+        self.ingreso_egreso_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        self.exportar_lbl = tk.Label(self.root, text="Nombre del archivo CSV:")
-        self.exportar_lbl.grid(row=21, column=0)
-        self.exportar_entry = tk.Entry(self.root)
-        self.exportar_entry.grid(row=21, column=1)
+        self.operador_lbl = tk.Label(self.tab_transporte, text="Operador:")
+        self.operador_lbl.grid(row=1, column=0, padx=5, pady=5)
+        self.operador_entry = tk.Entry(self.tab_transporte)
+        self.operador_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        self.exportar_btn = tk.Button(self.root, text="Exportar a CSV", command=self.exportar_a_csv)
-        self.exportar_btn.grid(row=22, column=0, pady=10)
+        self.hora_llegada_lbl = tk.Label(self.tab_transporte, text="Hora de Llegada:")
+        self.hora_llegada_lbl.grid(row=2, column=0, padx=5, pady=5)
+        self.hora_llegada_entry = tk.Entry(self.tab_transporte)
+        self.hora_llegada_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        self.guardar_btn = tk.Button(self.root, text="Guardar Inventario", command=self.guardar_inventario)
-        self.guardar_btn.grid(row=22, column=1, pady=10)
+        self.hora_retiro_lbl = tk.Label(self.tab_transporte, text="Hora de Retiro:")
+        self.hora_retiro_lbl.grid(row=3, column=0, padx=5, pady=5)
+        self.hora_retiro_entry = tk.Entry(self.tab_transporte)
+        self.hora_retiro_entry.grid(row=3, column=1, padx=5, pady=5)
 
-        self.cargar_btn = tk.Button(self.root, text="Cargar Inventario", command=self.cargar_inventario)
-        self.cargar_btn.grid(row=22, column=2, pady=10)
+        self.registrar_transporte_btn = tk.Button(self.tab_transporte, text="Registrar Transporte", command=self.registrar_transporte)
+        self.registrar_transporte_btn.grid(row=4, column=0, pady=10)
 
-        self.ingreso_egreso_lbl = tk.Label(self.root, text="Ingreso/Egreso:")
-        self.ingreso_egreso_lbl.grid(row=23, column=0)
-        self.ingreso_egreso_entry = ttk.Combobox(self.root, values=["ingreso", "egreso"])
-        self.ingreso_egreso_entry.grid(row=23, column=1)
+        # Tab Consultas
+        self.consultar_btn = tk.Button(self.tab_consultas, text="Consultar Inventario", command=self.consultar_inventario)
+        self.consultar_btn.grid(row=0, column=0, pady=10, padx=5)
 
-        self.operador_lbl = tk.Label(self.root, text="Operador:")
-        self.operador_lbl.grid(row=24, column=0)
-        self.operador_entry = tk.Entry(self.root)
-        self.operador_entry.grid(row=24, column=1)
+        self.verificar_fechas_btn = tk.Button(self.tab_consultas, text="Verificar Fechas de Vencimiento", command=self.verificar_fechas_vencimiento)
+        self.verificar_fechas_btn.grid(row=1, column=0, pady=10, padx=5)
 
-        self.temperatura_lbl = tk.Label(self.root, text="Temperatura:")
-        self.temperatura_lbl.grid(row=25, column=0)
-        self.temperatura_entry = tk.Entry(self.root)
-        self.temperatura_entry.grid(row=25, column=1)
-
-        self.hora_llegada_lbl = tk.Label(self.root, text="Hora de Llegada:")
-        self.hora_llegada_lbl.grid(row=26, column=0)
-        self.hora_llegada_entry = tk.Entry(self.root)
-        self.hora_llegada_entry.grid(row=26, column=1)
-
-        self.hora_retiro_lbl = tk.Label(self.root, text="Hora de Retiro:")
-        self.hora_retiro_lbl.grid(row=27, column=0)
-        self.hora_retiro_entry = tk.Entry(self.root)
-        self.hora_retiro_entry.grid(row=27, column=1)
-
-        self.registrar_transporte_btn = tk.Button(self.root, text="Registrar Transporte", command=self.registrar_transporte)
-        self.registrar_transporte_btn.grid(row=28, column=0, pady=10)
-
-        self.reporte_transporte_btn = tk.Button(self.root, text="Generar Reporte de Transporte", command=self.generar_reporte_transporte)
-        self.reporte_transporte_btn.grid(row=29, column=0, pady=10)
-
-        self.enviar_correo_btn = tk.Button(self.root, text="Enviar Reporte por Correo", command=self.enviar_reporte_por_correo)
-        self.enviar_correo_btn.grid(row=30, column=0, pady=10)
-
-        self.generar_pdf_btn = tk.Button(self.root, text="Generar PDF", command=self.generar_pdf)
-        self.generar_pdf_btn.grid(row=31, column=0, pady=10)
-
-        self.generar_grafico_btn = tk.Button(self.root, text="Generar Gráfico", command=self.generar_grafico)
-        self.generar_grafico_btn.grid(row=32, column=0, pady=10)
-
-        self.reporte_lbl = tk.Label(self.root, text="Generar Reporte por:")
-        self.reporte_lbl.grid(row=33, column=0)
-        self.reporte_criterio = ttk.Combobox(self.root, values=["fecha", "producto", "unidad_medida"])
-        self.reporte_criterio.grid(row=33, column=1)
-
-        self.reporte_valor_lbl = tk.Label(self.root, text="Valor del criterio:")
-        self.reporte_valor_lbl.grid(row=34, column=0)
-        self.reporte_valor = tk.Entry(self.root)
-        self.reporte_valor.grid(row=34, column=1)
-
-        self.reporte_btn = tk.Button(self.root, text="Generar Reporte", command=self.generar_reporte)
-        self.reporte_btn.grid(row=35, column=0, pady=10)
-
-        self.factura_btn = tk.Button(self.root, text="Imprimir Factura", command=self.imprimir_factura)
-        self.factura_btn.grid(row=36, column=0, pady=10)
-
-        self.salir_btn = tk.Button(self.root, text="Salir", command=self.root.quit)
-        self.salir_btn.grid(row=37, column=0, pady=10)
-
-        self.tabla = ttk.Treeview(self.root, columns=("Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"), show='headings')
+        self.tabla = ttk.Treeview(self.tab_consultas, columns=("Nombre", "Cantidad", "Unidad de Medida", "Fecha de Vencimiento", "Tarifa", "Temperatura"), show='headings')
         self.tabla.heading("Nombre", text="Nombre")
         self.tabla.heading("Cantidad", text="Cantidad")
         self.tabla.heading("Unidad de Medida", text="Unidad de Medida")
         self.tabla.heading("Fecha de Vencimiento", text="Fecha de Vencimiento")
         self.tabla.heading("Tarifa", text="Tarifa")
         self.tabla.heading("Temperatura", text="Temperatura")
-        self.tabla.grid(row=38, column=0, columnspan=3, pady=10)
+        self.tabla.grid(row=2, column=0, columnspan=3, pady=10, padx=5)
+
+        # Tab Reportes
+        self.exportar_lbl = tk.Label(self.tab_reportes, text="Nombre del archivo CSV:")
+        self.exportar_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.exportar_entry = tk.Entry(self.tab_reportes)
+        self.exportar_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.exportar_btn = tk.Button(self.tab_reportes, text="Exportar a CSV", command=self.exportar_a_csv)
+        self.exportar_btn.grid(row=1, column=0, pady=5, padx=5)
+
+        self.guardar_btn = tk.Button(self.tab_reportes, text="Guardar Inventario", command=self.guardar_inventario)
+        self.guardar_btn.grid(row=1, column=1, pady=5, padx=5)
+
+        self.cargar_btn = tk.Button(self.tab_reportes, text="Cargar Inventario", command=self.cargar_inventario)
+        self.cargar_btn.grid(row=1, column=2, pady=5, padx=5)
+
+        self.reporte_transporte_btn = tk.Button(self.tab_reportes, text="Generar Reporte de Transporte", command=self.generar_reporte_transporte)
+        self.reporte_transporte_btn.grid(row=2, column=0, pady=5, padx=5)
+
+        self.enviar_correo_btn = tk.Button(self.tab_reportes, text="Enviar Reporte por Correo", command=self.enviar_reporte_por_correo)
+        self.enviar_correo_btn.grid(row=3, column=0, pady=5, padx=5)
+
+        self.generar_pdf_btn = tk.Button(self.tab_reportes, text="Generar PDF", command=self.generar_pdf)
+        self.generar_pdf_btn.grid(row=4, column=0, pady=5, padx=5)
+
+        self.generar_grafico_btn = tk.Button(self.tab_reportes, text="Generar Gráfico", command=self.generar_grafico)
+        self.generar_grafico_btn.grid(row=5, column=0, pady=5, padx=5)
+
+        self.reporte_lbl = tk.Label(self.tab_reportes, text="Generar Reporte por:")
+        self.reporte_lbl.grid(row=6, column=0, padx=5, pady=5)
+        self.reporte_criterio = ttk.Combobox(self.tab_reportes, values=["fecha", "producto", "unidad_medida"])
+        self.reporte_criterio.grid(row=6, column=1, padx=5, pady=5)
+
+        self.reporte_valor_lbl = tk.Label(self.tab_reportes, text="Valor del criterio:")
+        self.reporte_valor_lbl.grid(row=7, column=0, padx=5, pady=5)
+        self.reporte_valor = tk.Entry(self.tab_reportes)
+        self.reporte_valor.grid(row=7, column=1, padx=5, pady=5)
+
+        self.reporte_btn = tk.Button(self.tab_reportes, text="Generar Reporte", command=self.generar_reporte)
+        self.reporte_btn.grid(row=8, column=0, pady=5, padx=5)
+
+        self.factura_btn = tk.Button(self.tab_reportes, text="Imprimir Factura", command=self.imprimir_factura)
+        self.factura_btn.grid(row=9, column=0, pady=5, padx=5)
 
     def agregar_almacen(self):
         nombre_almacen = self.almacen_entry.get()
@@ -531,7 +574,8 @@ class InventarioGUI:
             messagebox.showerror("Error", "Fecha de vencimiento no válida. Debe ser en formato YYYY-MM-DD.")
             return
 
-        producto = Producto(nombre, float(cantidad), unidad_medida, fecha_vencimiento, float(tarifa))
+        tarifa_val = float(tarifa) if tarifa else 0.0
+        producto = Producto(nombre, float(cantidad), unidad_medida, fecha_vencimiento, tarifa_val)
         producto.temperatura = temperatura
         self.inventario.agregar_producto(producto)
         self.actualizar_tabla()
@@ -660,7 +704,8 @@ class InventarioGUI:
             messagebox.showerror("Error", "Fecha de vencimiento no válida. Debe ser en formato YYYY-MM-DD.")
             return
 
-        if self.sistema_inventario.registrar_ingreso_egreso(tipo, self.almacenes_combo.get(), nombre, float(cantidad), unidad_medida, fecha_vencimiento, float(tarifa), operador, temperatura, hora_llegada, hora_retiro):
+        tarifa_val = float(tarifa) if tarifa else 0.0
+        if self.sistema_inventario.registrar_ingreso_egreso(tipo, self.almacenes_combo.get(), nombre, float(cantidad), unidad_medida, fecha_vencimiento, tarifa_val, operador, temperatura, hora_llegada, hora_retiro):
             self.actualizar_tabla()
             messagebox.showinfo("Éxito", f"Registro de transporte {tipo} para {nombre} registrado.")
         else:
@@ -717,8 +762,10 @@ class InventarioGUI:
 
         nombre_archivo = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png")])
         if nombre_archivo:
-            self.sistema_inventario.generar_grafico(nombre_archivo)
-            messagebox.showinfo("Éxito", f"Gráfico generado en {nombre_archivo}")
+            if self.sistema_inventario.generar_grafico(nombre_archivo, self.almacenes_combo.get()) is not False:
+                messagebox.showinfo("Éxito", f"Gráfico generado en {nombre_archivo}")
+            else:
+                messagebox.showerror("Error", "No se pudo generar el gráfico.")
 
     def generar_reporte(self):
         if not self.inventario:
@@ -763,8 +810,8 @@ def main():
     sistema_autenticacion = SistemaAutenticacion()
 
     # Crear usuarios iniciales (para prueba)
-    sistema_autenticacion.registrar_usuario("admin", "admin123")
-    sistema_autenticacion.registrar_usuario("usuario", "user123")
+    sistema_autenticacion.registrar_usuario("admin", "admin123", "admin")
+    sistema_autenticacion.registrar_usuario("usuario", "user123", "usuario")
 
     app = InventarioGUI(root, sistema_inventario, sistema_autenticacion)
     root.mainloop()
