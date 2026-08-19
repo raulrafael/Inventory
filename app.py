@@ -358,6 +358,13 @@ class InventarioGUI:
         if self.usuario_actual and self.usuario_actual.rol == 'admin':
             self.notebook.add(self.tab_reportes, text="Reportes")
 
+        self.crear_tab_almacen()
+        self.crear_tab_productos()
+        self.crear_tab_transporte()
+        self.crear_tab_consultas()
+        self.crear_tab_reportes()
+
+    def crear_tab_almacen(self):
         # Tab Almacén
         self.almacen_lbl = tk.Label(self.tab_almacen, text="Nombre del Almacén:")
         self.almacen_lbl.grid(row=0, column=0, padx=5, pady=5)
@@ -376,6 +383,7 @@ class InventarioGUI:
         self.salir_btn = tk.Button(self.tab_almacen, text="Salir", command=self.root.quit)
         self.salir_btn.grid(row=2, column=0, pady=10)
 
+    def crear_tab_productos(self):
         # Tab Productos
         self.nombre_lbl = tk.Label(self.tab_productos, text="Nombre del Producto:")
         self.nombre_lbl.grid(row=0, column=0, padx=5, pady=5)
@@ -456,6 +464,7 @@ class InventarioGUI:
         self.editar_btn = tk.Button(self.tab_productos, text="Editar Producto", command=self.editar_producto)
         self.editar_btn.grid(row=16, column=0, pady=10)
 
+    def crear_tab_transporte(self):
         # Tab Transporte
         self.ingreso_egreso_lbl = tk.Label(self.tab_transporte, text="Ingreso/Egreso:")
         self.ingreso_egreso_lbl.grid(row=0, column=0, padx=5, pady=5)
@@ -480,6 +489,7 @@ class InventarioGUI:
         self.registrar_transporte_btn = tk.Button(self.tab_transporte, text="Registrar Transporte", command=self.registrar_transporte)
         self.registrar_transporte_btn.grid(row=4, column=0, pady=10)
 
+    def crear_tab_consultas(self):
         # Tab Consultas
         self.consultar_btn = tk.Button(self.tab_consultas, text="Consultar Inventario", command=self.consultar_inventario)
         self.consultar_btn.grid(row=0, column=0, pady=10, padx=5)
@@ -496,6 +506,7 @@ class InventarioGUI:
         self.tabla.heading("Temperatura", text="Temperatura")
         self.tabla.grid(row=2, column=0, columnspan=3, pady=10, padx=5)
 
+    def crear_tab_reportes(self):
         # Tab Reportes
         self.exportar_lbl = tk.Label(self.tab_reportes, text="Nombre del archivo CSV:")
         self.exportar_lbl.grid(row=0, column=0, padx=5, pady=5)
