@@ -136,8 +136,9 @@ class Inventario:
             print(f"El archivo {nombre_archivo} no existe.")
 
     def buscar_producto(self, nombre_producto):
+        nombre_producto_lower = nombre_producto.lower()
         for producto in self.productos:
-            if producto.nombre.lower() == nombre_producto.lower():
+            if producto.nombre.lower() == nombre_producto_lower:
                 return producto
         return None
 
